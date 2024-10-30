@@ -1,0 +1,212 @@
+
+use tokio::time::timeout;
+use crate::BotState;
+use chrono::Utc;
+use std::sync::Arc;
+use teloxide::prelude::*;
+use tokio::time::{interval, Duration, Instant};
+use rand::seq::IteratorRandom;
+use crate::types::UserReminderPreferences;
+use std::error::Error;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+
+pub async fn handle_opt_out(
+    bot: Bot,
+    msg: Message,
+    state: Arc<BotState>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let mut preferences = state.user_preferences.lock().await;
+    if let Some(prefs) = preferences.get_mut(&msg.chat.id.0) {
+        prefs.opted_in = false;
+        
+        bot.send_message(
+            msg.chat.id,
+            "✅ You've successfully opted out of reminders. Use /optin anytime to start receiving them again.",
+        )
+        .await?;
+    }
+
+    state.save_preferences().await?;
+    Ok(())
+}
+
+
+pub async fn handle_opt_in(
+    bot: Bot,
+    msg: Message,
+    state: Arc<BotState>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    log::info!("Handling Optin Option...");
+    
+    // Try to acquire the lock with timeout
+    let mut preferences = match state.acquire_preferences_lock().await {
+        Ok(guard) => guard,
+        Err(e) => {
+            log::error!("Failed to acquire preferences lock: {}", e);
+            bot.send_message(
+                msg.chat.id,
+                "Sorry, the system is busy. Please try again in a few moments.",
+            )
+            .await?;
+            return Ok(());
+        }
+    };
+
+    log::info!("Lock acquired successfully");
+    
+    // Wrap the critical section in a block to ensure the lock is released as soon as possible
+    {
+        let prefs = preferences.entry(msg.chat.id.0).or_insert_with(|| {
+            UserReminderPreferences::new(
+                msg.chat.id.0,
+                msg.from().map_or("Unknown".to_string(), |u| u.first_name.clone())
+            )
+        });
+        prefs.opted_in = true;
+    }
+    
+    // Release the lock before sending the message and saving preferences
+    drop(preferences);
+    
+    log::info!("Sending confirmation message");
+    bot.send_message(
+        msg.chat.id,
+        "✅ You've successfully opted in to receive daily reminders! You'll receive one random reminder every 24 hours.",
+    )
+    .await?;
+
+    log::info!("Saving preferences");
+    // Add timeout to save_preferences as well
+    match timeout(Duration::from_secs(5), state.save_preferences()).await {
+        Ok(result) => {
+            if let Err(e) = result {
+                log::error!("Error saving preferences: {}", e);
+                bot.send_message(
+                    msg.chat.id,
+                    "Warning: There was an issue saving your preferences. Your settings might not persist after bot restart.",
+                )
+                .await?;
+            }
+        }
+        Err(_) => {
+            log::error!("Timeout while saving preferences");
+            bot.send_message(
+                msg.chat.id,
+                "Warning: Saving preferences timed out. Your settings might not persist after bot restart.",
+            )
+            .await?;
+        }
+    }
+
+    log::info!("Opt-in handling completed successfully");
+    Ok(())
+}
+
+pub async fn handle_preferences(
+    bot: Bot,
+    msg: Message,
+    state: Arc<BotState>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let preferences = state.user_preferences.lock().await;
+    
+    if let Some(prefs) = preferences.get(&msg.chat.id.0) {
+        let status = if prefs.opted_in { "opted in" } else { "opted out" };
+        
+        bot.send_message(
+            msg.chat.id,
+            format!(
+                "Your reminder preferences:\nStatus: {}\nLast reminder: {}", 
+                status,
+                prefs.last_reminder
+                    .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                    .unwrap_or_else(|| "Never".to_string())
+            ),
+        )
+        .await?;
+    } else {
+        bot.send_message(
+            msg.chat.id,
+            "You haven't set any preferences yet. Use /optin to start receiving reminders.",
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
+
+
+pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
+    let mut interval = interval(Duration::from_secs(60)); // 1 minute interval
+    let mut next_send_time = Instant::now() + Duration::from_secs(60); // First send at 1 minute
+
+    loop {
+        let now = Instant::now();
+        if now >= next_send_time {
+            send_reminders(&bot, &state).await;
+            next_send_time = now + Duration::from_secs(60); // Update next send time
+        }
+
+        interval.tick().await;
+    }
+}
+
+async fn send_reminders(bot: &Bot, state: &Arc<BotState>) {
+    let preferences = match state.acquire_preferences_lock().await {
+        Ok(guard) => guard,
+        Err(e) => {
+            log::error!("Failed to acquire lock in reminder sender: {}", e);
+            return;
+        }
+    };
+
+    let now = Utc::now();
+    let mut rng = StdRng::from_entropy();
+
+    for (user_id, prefs) in preferences.iter() {
+        if !prefs.opted_in {
+            continue;
+        }
+
+        // Check if at least 1 minute has passed since last reminder
+        if let Some(last_reminder) = prefs.last_reminder {
+            if (now - last_reminder).num_minutes() < 1 {
+                continue;
+            }
+        }
+
+        // Use the thread-safe RNG instance
+        if let Some(template) = state.reminder_templates.iter().choose(&mut rng) {
+            if let Err(e) = bot
+                .send_message(ChatId(*user_id), &template.message)
+                .await
+            {
+                log::error!("Failed to send reminder to user {}: {}", user_id, e);
+                continue;
+            }
+        }
+    }
+
+    drop(preferences);
+
+    let mut preferences = match state.acquire_preferences_lock().await {
+        Ok(guard) => guard,
+        Err(e) => {
+            log::error!("Failed to acquire lock for updating reminder times: {}", e);
+            return;
+        }
+    };
+
+    for (_, prefs) in preferences.iter_mut() {
+        if prefs.opted_in {
+            prefs.last_reminder = Some(now);
+        }
+    }
+
+    drop(preferences);
+
+    if let Err(_) = tokio::time::timeout(Duration::from_secs(5), state.save_preferences()).await {
+        log::error!("Timeout while saving preferences in reminder sender");
+    }
+}
