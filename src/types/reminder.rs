@@ -3,7 +3,6 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ReminderTemplate {
-    // pub id: u32,
     pub message: String,
 }
 

@@ -10,7 +10,8 @@ use crate::types::UserReminderPreferences;
 use std::error::Error;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-
+use chrono::{Datelike, Weekday};
+// use chrono::prelude::*;
 pub async fn handle_opt_out(
     bot: Bot,
     msg: Message,
@@ -138,21 +139,31 @@ pub async fn handle_preferences(
 
 
 pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
+    let mut template_sender_id = 0;
     let mut interval = interval(Duration::from_secs(60)); // 1 minute interval
-    let mut next_send_time = Instant::now() + Duration::from_secs(60); // First send at 1 minute
+    let mut next_send_time = Utc::now() + Duration::from_secs(5); // First send at 1 minute
 
     loop {
-        let now = Instant::now();
-        if now >= next_send_time {
-            send_reminders(&bot, &state).await;
-            next_send_time = now + Duration::from_secs(60); // Update next send time
-        }
+        // let now = Instant::now();
+        let now = Utc::now();
 
+        if now >= next_send_time {
+
+            send_reminders(&bot, &state, template_sender_id).await;
+            next_send_time = now + Duration::from_secs(60); // Update next send time
+            log::info!("This is the id of the reminder template {}", template_sender_id);
+
+            // check if weekday is a Monday, if yes, increment the id to send a new reminder for the week
+            if now.weekday() != Weekday::Mon {
+                template_sender_id += 1;
+            }
+        }
         interval.tick().await;
     }
 }
 
-async fn send_reminders(bot: &Bot, state: &Arc<BotState>) {
+async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: usize) {
+    // let mut template_sender_id = 0;
     let preferences = match state.acquire_preferences_lock().await {
         Ok(guard) => guard,
         Err(e) => {
@@ -162,7 +173,9 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>) {
     };
 
     let now = Utc::now();
-    let mut rng = StdRng::from_entropy();
+    log::info!("This is the time: {} {} {}", now.year(), now.month(), now.day());
+
+    // let mut rng = StdRng::from_entropy();
 
     for (user_id, prefs) in preferences.iter() {
         if !prefs.opted_in {
@@ -177,7 +190,14 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>) {
         }
 
         // Use the thread-safe RNG instance
-        if let Some(template) = state.reminder_templates.iter().choose(&mut rng) {
+        if let Some(template) = state.reminder_templates.get(template_sender_id) {
+            // log::info!("This is the id of the reminder template {}", template_sender_id);
+
+            // template_sender_id += 1;
+        // Use the thread-safe RNG instance
+        // if let Some(template) = state.reminder_templates.iter().choose(&mut rng) {
+
+        
             if let Err(e) = bot
                 .send_message(ChatId(*user_id), &template.message)
                 .await
