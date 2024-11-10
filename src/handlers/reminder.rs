@@ -154,7 +154,7 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
             log::info!("This is the id of the reminder template {}", template_sender_id);
 
             // check if weekday is a Monday, if yes, increment the id to send a new reminder for the week
-            if now.weekday() != Weekday::Mon {
+            if now.weekday() == Weekday::Mon {
                 template_sender_id += 1;
             }
         }

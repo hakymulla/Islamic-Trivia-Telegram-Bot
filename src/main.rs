@@ -92,29 +92,6 @@ mod keyboard;
 //         .dispatch()
 //         .await;
 
-//     // Create a simple health check endpoint
-//     let health_route = warp::path::end().map(|| "Bot is running!");
-
-//     // Get port from environment variable or use default
-//     let port = env::var("PORT")
-//         .unwrap_or_else(|_| "8080".to_string())
-//         .parse()
-//         .unwrap_or(8080);
-    
-//     let addr: SocketAddr = ([0, 0, 0, 0], port).into();
-    
-//     // Start the web server
-//     log::info!("Starting web server on port {}", port);
-//     let server_handle = tokio::spawn(
-//         warp::serve(health_route).run(addr)
-//     );
-
-//     // Wait for both the dispatcher and server
-//     let _ = tokio::try_join!(
-//         dispatcher_handle,
-//         server_handle,
-//     )?;
-
 
 //     Ok(())
 // }
@@ -183,17 +160,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
  
      log::info!("Starting command dispatching...");
 
-    // Dispatcher::builder(bot, handler)
-    //     .dependencies(dptree::deps![state])
-    //     .enable_ctrlc_handler()
-    //     .build()
-    //     .dispatch()
-    //     .await;
+    //  Dispatcher::builder(bot, handler)
+        // .dependencies(dptree::deps![state])
+        // .enable_ctrlc_handler()
+        // .build()
+        // .dispatch()
+        // .await;
 
 
     // Build the dispatcher
     let mut dispatcher = Dispatcher::builder(bot, handler)
-        .dependencies(dptree::deps![state.clone()])
+        .dependencies(dptree::deps![state])
         .enable_ctrlc_handler()
         .build();
 
