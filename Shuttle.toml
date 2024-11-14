@@ -1,0 +1,16 @@
+# Declare ignored files that should be included in deployment:
+[deploy]
+include = [
+  "user_scores.json",
+  "user_preferences.json",
+  "questions.csv",
+  "reminders.csv",
+]
+
+[build]
+assets = [
+  "user_scores.json",
+  "user_preferences.json",
+  "questions.csv",
+  "reminders.csv",
+]

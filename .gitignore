@@ -1,2 +1,8 @@
 /target
 .env
+.shuttle*
+Secrets*.toml
+user_scores.json,
+user_preferences.json,
+questions.csv,
+reminders.csv

@@ -1,6 +1,0 @@
-target/
-Dockerfile
-.git/
-.gitignore
-README.md
-tests/

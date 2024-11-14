@@ -1,17 +1,16 @@
 
-use tokio::time::timeout;
 use crate::BotState;
-use chrono::Utc;
+use chrono::{Datelike, Weekday, Timelike, Utc};
 use std::sync::Arc;
 use teloxide::prelude::*;
-use tokio::time::{interval, Duration, Instant};
+use tokio::time::{timeout, interval, Duration, Instant};
 use rand::seq::IteratorRandom;
 use crate::types::UserReminderPreferences;
 use std::error::Error;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use chrono::{Datelike, Weekday};
 // use chrono::prelude::*;
+
 pub async fn handle_opt_out(
     bot: Bot,
     msg: Message,
@@ -142,9 +141,9 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
     let mut template_sender_id = 0;
     let mut interval = interval(Duration::from_secs(60)); // 1 minute interval
     let mut next_send_time = Utc::now() + Duration::from_secs(5); // First send at 1 minute
+    let mut last_monday_check = Utc::now().date_naive();
 
     loop {
-        // let now = Instant::now();
         let now = Utc::now();
 
         if now >= next_send_time {
@@ -153,9 +152,10 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
             next_send_time = now + Duration::from_secs(60); // Update next send time
             log::info!("This is the id of the reminder template {}", template_sender_id);
 
-            // check if weekday is a Monday, if yes, increment the id to send a new reminder for the week
-            if now.weekday() == Weekday::Mon {
+            if now.weekday() == Weekday::Mon && now.date_naive() != last_monday_check {
                 template_sender_id += 1;
+                last_monday_check = now.date_naive(); // Update the last check date
+                log::info!("Monday detected: Incremented template_sender_id to {}", template_sender_id);
             }
         }
         interval.tick().await;
@@ -163,7 +163,6 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
 }
 
 async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: usize) {
-    // let mut template_sender_id = 0;
     let preferences = match state.acquire_preferences_lock().await {
         Ok(guard) => guard,
         Err(e) => {
@@ -173,9 +172,7 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: us
     };
 
     let now = Utc::now();
-    log::info!("This is the time: {} {} {}", now.year(), now.month(), now.day());
-
-    // let mut rng = StdRng::from_entropy();
+    log::info!("This is the time: {} {} {} {} {}", now.year(), now.month(), now.day(), now.hour(), now.minute());
 
     for (user_id, prefs) in preferences.iter() {
         if !prefs.opted_in {
