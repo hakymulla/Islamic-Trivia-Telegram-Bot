@@ -4,7 +4,12 @@ use chrono::{DateTime, Utc};
 #[derive(Debug, Clone, Deserialize)]
 pub struct ReminderTemplate {
     pub message: String,
+    pub arabic: String,
+    pub transliteration: String,
+    pub translation: String,
+    pub reference: String,
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserReminderPreferences {

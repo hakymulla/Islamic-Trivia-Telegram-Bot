@@ -13,7 +13,6 @@ pub enum GameState {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Question {
-    pub id: u32,
     pub question: String,
     pub correct_answer: String,
     pub option1: String,

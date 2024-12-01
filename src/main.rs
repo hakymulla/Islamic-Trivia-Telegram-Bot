@@ -22,8 +22,7 @@ mod keyboard;
 async fn axum(
     #[shuttle_runtime::Secrets] secret_store: SecretStore,
 ) -> shuttle_axum::ShuttleAxum  {
-    // pretty_env_logger::init();
-    // log::info!("Starting trivia bot...");
+    log::info!("Starting trivia bot...");
 
     // Get bot token from secrets
     let bot_token = secret_store
@@ -36,23 +35,24 @@ async fn axum(
     // Initialize state
     let questions = state::load_questions()
         .expect("Failed to load questions");
-    // log::info!("Loaded {} questions", questions.len());
+    log::info!("Loaded {} questions", questions.len());
 
     let reminder_templates = state::load_reminder_templates()
+        .await
         .expect("Failed to load reminder templates");
-    // log::info!("Loaded {} reminder templates", reminder_templates.len());
+    log::info!("Loaded {} reminder templates", reminder_templates.len());
 
     let user_scores = UserScore::load_scores()
         .expect("Failed to load user scores");
-    // log::info!("Loaded scores for {} users", user_scores.len());
+    log::info!("Loaded scores for {} users", user_scores.len());
 
     let user_preferences = match BotState::initialize_preferences().await {
         Ok(prefs) => {
-            // log::info!("Successfully initialized preferences for {} users", prefs.len());
+            log::info!("Successfully initialized preferences for {} users", prefs.len());
             prefs
         }
         Err(e) => {
-            // log::error!("Failed to initialize preferences: {}. Starting with empty preferences.", e);
+            log::error!("Failed to initialize preferences: {}. Starting with empty preferences.", e);
             HashMap::new()
         }
     };

@@ -11,7 +11,7 @@ use crate::error::ScoreError;
 use crate::types::{ReminderTemplate, UserReminderPreferences};
 use tokio::time::timeout;
 use std::time::Duration;
-
+use reqwest;
 pub struct BotState {
     pub questions: Vec<Question>,
     pub active_questions: Mutex<HashMap<i64, ActiveQuestion>>,
@@ -120,13 +120,52 @@ pub fn load_questions() -> Result<Vec<Question>, Box<dyn Error>> {
 }
 
 
-pub fn load_reminder_templates() -> Result<Vec<ReminderTemplate>, Box<dyn Error>> {
-    let mut templates = Vec::new();
-    let mut rdr = csv::Reader::from_path("reminders.csv").expect("reminder failed");
+// pub fn load_reminder_templates() -> Result<Vec<ReminderTemplate>, Box<dyn Error>> {
+//     let mut templates = Vec::new();
+//     let mut rdr = csv::Reader::from_path("reminders.csv").expect("reminder failed");
     
-    for result in rdr.deserialize() {
-        let template: ReminderTemplate = result?;
-        templates.push(template);
+//     for result in rdr.deserialize() {
+//         let template: ReminderTemplate = result?;
+//         templates.push(template);
+//     }
+//     Ok(templates)
+// }
+
+pub async fn load_reminder_templates() -> Result<Vec<ReminderTemplate>, Box<dyn Error>> {
+    let mut templates = Vec::new();
+    
+    // Make sure to use the correct export URL format
+    let url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRjbtw5iUNyWqrI1sFmAaO4KOxwLuwa_TgJub4b74Uv5uQYYSPl69BIoFBPLQbPhZ5oKn2y2cJrHdIL/pub?gid=0&single=true&output=csv";
+    
+    let response = reqwest::get(url).await?;
+    let content = response.text().await?;
+    
+    // Verify we got CSV and not HTML
+    if content.starts_with("<!DOCTYPE html>") {
+        return Err("Received HTML instead of CSV. Check if the sheet is properly published and accessible.".into());
     }
+    
+    let mut rdr = csv::ReaderBuilder::new()
+        .flexible(true)
+        .trim(csv::Trim::All)
+        .from_reader(content.as_bytes());
+
+    // Print headers to verify structure
+    println!("Headers: {:?}", rdr.headers()?);
+    
+    for (index, result) in rdr.deserialize().enumerate() {
+        match result {
+            Ok(template) => templates.push(template),
+            Err(e) => {
+                println!("Error at row {}: {}", index + 1, e);
+                continue;
+            }
+        }
+    }
+    
+    if templates.is_empty() {
+        return Err("No valid templates found".into());
+    }
+    
     Ok(templates)
 }

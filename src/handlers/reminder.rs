@@ -1,15 +1,11 @@
 
 use crate::BotState;
-use chrono::{Datelike, Weekday, Timelike, Utc};
+use chrono::{Datelike, Weekday, Utc};
 use std::sync::Arc;
 use teloxide::prelude::*;
-use tokio::time::{timeout, interval, Duration, Instant};
-use rand::seq::IteratorRandom;
+use tokio::time::{timeout, interval, Duration};
 use crate::types::UserReminderPreferences;
 use std::error::Error;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
-// use chrono::prelude::*;
 
 pub async fn handle_opt_out(
     bot: Bot,
@@ -150,7 +146,6 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
 
             send_reminders(&bot, &state, template_sender_id).await;
             next_send_time = now + Duration::from_secs(60); // Update next send time
-            log::info!("This is the id of the reminder template {}", template_sender_id);
 
             if now.weekday() == Weekday::Mon && now.date_naive() != last_monday_check {
                 template_sender_id += 1;
@@ -172,7 +167,6 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: us
     };
 
     let now = Utc::now();
-    log::info!("This is the time: {} {} {} {} {}", now.year(), now.month(), now.day(), now.hour(), now.minute());
 
     for (user_id, prefs) in preferences.iter() {
         if !prefs.opted_in {
@@ -190,13 +184,38 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: us
         if let Some(template) = state.reminder_templates.get(template_sender_id) {
             // log::info!("This is the id of the reminder template {}", template_sender_id);
 
-            // template_sender_id += 1;
-        // Use the thread-safe RNG instance
-        // if let Some(template) = state.reminder_templates.iter().choose(&mut rng) {
+            fn escape_markdown_v2(text: &str) -> String {
+                text.chars()
+                    .map(|c| match c {
+                        '_' | '*' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '=' | '|' | '{' | '}' | '.' | '!' => format!("\\{}", c),
+                        _ => c.to_string(),
+                    })
+                    .collect()
+            }
 
-        
+            let full_message = format!(
+                "❁❀❁❀ 🌅 *Remembrance* 🕌 ❀❁❀❁\n\
+                ━━━━━━━━━━━━━━━━━━━━━\n\
+                *{}* \n\n\
+                ✨ *𝒜𝓇𝒶𝒷𝒾𝒸 𝒯𝑒𝓍𝓉:*\n\
+                `{}`\n\n\
+                🌟  *𝒯𝓇𝒶𝓃𝓈𝓁𝒾𝓉𝑒𝓇𝒶𝓉𝒾𝑜𝓃:*\n\
+                `{}`\n\n\
+                🔤 *𝒯𝓇𝒶𝓃𝓈𝓁𝒶𝓉𝒾𝑜𝓃:*\n\
+                `{}`\n\n\
+                📚 *𝑅𝑒𝒻𝑒𝓇𝑒𝓃𝒸𝑒:*\n\
+                `{}`\n\n\
+                ━━━━━━━━━━━━━━━━━━━━━",
+                 &template.message,  
+                 &template.arabic, 
+                 escape_markdown_v2(&template.transliteration),  
+                 escape_markdown_v2(&template.translation), 
+                 escape_markdown_v2(&template.reference)
+            );
+            
             if let Err(e) = bot
-                .send_message(ChatId(*user_id), &template.message)
+                .send_message(ChatId(*user_id), &full_message)
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                 .await
             {
                 log::error!("Failed to send reminder to user {}: {}", user_id, e);
