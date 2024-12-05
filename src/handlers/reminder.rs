@@ -68,7 +68,7 @@ pub async fn handle_opt_in(
     log::info!("Sending confirmation message");
     bot.send_message(
         msg.chat.id,
-        "✅ You've successfully opted in to receive daily reminders! You'll receive one random reminder every 24 hours.",
+        "✅ You've successfully opted in to receive daily sunnah reminders! You'll receive the same reminder 4times daily for a week.",
     )
     .await?;
 

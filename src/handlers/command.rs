@@ -23,8 +23,7 @@ pub async fn command_handler(
                 \n 🕌 Use /question for a random question to deepen your Islamic knowledge.
                 \n 📚 Use /theme <category> for themed quizzes on various topics.
                 \n 🏆 Use /leaderboard to see top scores and track your progress.
-                \n 🔔 Use /optin to receive daily Islamic and Sunnah reminders (6 times a day) designed to help you build habits through repetition. Sunnah reminders change weekly to keep things fresh and engaging.
-                \n 🔕 Use /optout if you prefer not to receive reminders.
+                \n 🔔 Use /optin to receive daily Islamic and Sunnah reminders (4 times a day) designed to help you build habits through repetition. Sunnah reminders change weekly to keep things fresh and engaging.
                 \n ❓ Use /help for additional guidance.
                 "
             )
