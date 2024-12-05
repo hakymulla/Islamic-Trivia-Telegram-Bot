@@ -135,8 +135,8 @@ pub async fn handle_preferences(
 
 pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
     let mut template_sender_id = 0;
-    let mut interval = interval(Duration::from_secs(21600)); // 6hrs interval
-    let mut next_send_time = Utc::now() + Duration::from_secs(60); // First send at 1 minute
+    let mut interval = interval(Duration::from_secs(60)); // 60sec interval check
+    let mut next_send_time = Utc::now() + Duration::from_secs(5); // First send at 1 minute
     let mut last_monday_check = Utc::now().date_naive();
 
     loop {
@@ -145,7 +145,7 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
         if now >= next_send_time {
 
             send_reminders(&bot, &state, template_sender_id).await;
-            next_send_time = now + Duration::from_secs(21600); // Update next send time
+            next_send_time = now + Duration::from_secs(21600); // Update next send time (4hrs)
 
             if now.weekday() == Weekday::Mon && now.date_naive() != last_monday_check {
                 template_sender_id += 1;
