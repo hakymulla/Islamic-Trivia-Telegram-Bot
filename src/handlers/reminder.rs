@@ -127,7 +127,6 @@ pub async fn handle_preferences(
         )
         .await?;
     }
-
     Ok(())
 }
 
@@ -135,16 +134,20 @@ pub async fn handle_preferences(
 
 pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
     let mut template_sender_id = 0;
+    let mut template_sender_act_id = 0;
+
     let mut interval = interval(Duration::from_secs(60)); // 60sec interval check
     let mut next_send_time = Utc::now() + Duration::from_secs(5); // First send at 1 minute
     let mut last_monday_check = Utc::now().date_naive();
+
+    let next_send_time_act = Utc::now() + Duration::from_secs(5); // First send at 1 minute
+    let last_check_date = Utc::now().date_naive();
 
     loop {
         let now = Utc::now();
 
         if now >= next_send_time {
-
-            send_reminders(&bot, &state, template_sender_id).await;
+            send_reminders(&bot, &state, template_sender_id, true).await;
             next_send_time = now + Duration::from_secs(21600); // Update next send time (4hrs)
 
             if now.weekday() == Weekday::Mon && now.date_naive() != last_monday_check {
@@ -153,11 +156,21 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
                 log::info!("Monday detected: Incremented template_sender_id to {}", template_sender_id);
             }
         }
+
+        if now >= next_send_time_act {
+            send_reminders(&bot, &state, template_sender_act_id, false).await;
+            next_send_time = now + Duration::from_secs(21600); // Update next send time (4hrs)
+
+            if now.date_naive() != last_check_date {
+                template_sender_act_id += 1;
+                log::info!("Monday detected: Incremented template_sender_id to {}", template_sender_act_id);
+            }
+        }
         interval.tick().await;
     }
 }
 
-async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: usize) {
+async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: usize, is_template: bool) {
     let preferences = match state.acquire_preferences_lock().await {
         Ok(guard) => guard,
         Err(e) => {
@@ -181,47 +194,85 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: us
         }
 
         // Use the thread-safe RNG instance
-        if let Some(template) = state.reminder_templates.get(template_sender_id) {
-            // log::info!("This is the id of the reminder template {}", template_sender_id);
-
-            fn escape_markdown_v2(text: &str) -> String {
-                text.chars()
-                    .map(|c| match c {
-                        '_' | '*' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '=' | '|' | '{' | '}' | '.' | '!' => format!("\\{}", c),
-                        _ => c.to_string(),
-                    })
-                    .collect()
-            }
-
-            let full_message = format!(
-                "❁❀❁❀ 🌅 *Remembrance* 🕌 ❀❁❀❁\n\
-                ━━━━━━━━━━━━━━━━━━━━━\n\
-                *{}* \n\n\
-                ✨ *𝒜𝓇𝒶𝒷𝒾𝒸 𝒯𝑒𝓍𝓉:*\n\
-                `{}`\n\n\
-                🌟  *𝒯𝓇𝒶𝓃𝓈𝓁𝒾𝓉𝑒𝓇𝒶𝓉𝒾𝑜𝓃:*\n\
-                `{}`\n\n\
-                🔤 *𝒯𝓇𝒶𝓃𝓈𝓁𝒶𝓉𝒾𝑜𝓃:*\n\
-                `{}`\n\n\
-                📚 *𝑅𝑒𝒻𝑒𝓇𝑒𝓃𝒸𝑒:*\n\
-                `{}`\n\n\
-                ━━━━━━━━━━━━━━━━━━━━━",
-                 &template.message,  
-                 &template.arabic, 
-                 escape_markdown_v2(&template.transliteration),  
-                 escape_markdown_v2(&template.translation), 
-                 escape_markdown_v2(&template.reference)
-            );
-            
-            if let Err(e) = bot
-                .send_message(ChatId(*user_id), &full_message)
-                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                .await
-            {
-                log::error!("Failed to send reminder to user {}: {}", user_id, e);
-                continue;
+        if is_template {
+            if let Some(template) = state.reminder_templates.get(template_sender_id) {
+                fn escape_markdown_v2(text: &str) -> String {
+                    text.chars()
+                        .map(|c| match c {
+                            '_' | '*' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '=' | '|' | '{' | '}' | '.' | '!' => format!("\\{}", c),
+                            _ => c.to_string(),
+                        })
+                        .collect()
+                }
+    
+                let full_message = format!(
+                    "❁❀❁❀ 🌅 *Remembrance* 🕌 ❀❁❀❁\n\
+                    ━━━━━━━━━━━━━━━━━━━━━\n\
+                    *{}* \n\n\
+                    ✨ *𝒜𝓇𝒶𝒷𝒾𝒸 𝒯𝑒𝓍𝓉:*\n\
+                    `{}`\n\n\
+                    🌟  *𝒯𝓇𝒶𝓃𝓈𝓁𝒾𝓉𝑒𝓇𝒶𝓉𝒾𝑜𝓃:*\n\
+                    `{}`\n\n\
+                    🔤 *𝒯𝓇𝒶𝓃𝓈𝓁𝒶𝓉𝒾𝑜𝓃:*\n\
+                    `{}`\n\n\
+                    📚 *𝑅𝑒𝒻𝑒𝓇𝑒𝓃𝒸𝑒:*\n\
+                    `{}`\n\n\
+                    ━━━━━━━━━━━━━━━━━━━━━",
+                     &template.message,  
+                     &template.arabic, 
+                     escape_markdown_v2(&template.transliteration),  
+                     escape_markdown_v2(&template.translation), 
+                     escape_markdown_v2(&template.reference)
+                );
+                
+                if let Err(e) = bot
+                    .send_message(ChatId(*user_id), &full_message)
+                    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                    .await
+                {
+                    log::error!("Failed to send reminder to user {}: {}", user_id, e);
+                    continue;
+                }
             }
         }
+
+        if is_template == false {
+            if let Some(template) = state.reminder_templates_act.get(template_sender_id) {
+                fn escape_markdown_v2(text: &str) -> String {
+                    text.chars()
+                        .map(|c| match c {
+                            '_' | '*' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '=' | '|' | '{' | '}' | '.' | '!' => format!("\\{}", c),
+                            _ => c.to_string(),
+                        })
+                        .collect()
+                }
+    
+                let full_message = format!(
+                    "❁❀❁❀ 🌅 *Remembrance* 🕌 ❀❁❀❁\n\
+                    ━━━━━━━━━━━━━━━━━━━━━\n\
+                    *{}* \n\n\
+                    🔤 *𝒜𝒸𝓉:*\n\
+                    `{}`\n\n\
+                    📚 *𝑅𝑒𝒻𝑒𝓇𝑒𝓃𝒸𝑒:*\n\
+                    `{}`\n\n\
+                    ━━━━━━━━━━━━━━━━━━━━━",
+                     &template.message,  
+                     &template.act, 
+                     escape_markdown_v2(&template.reference)
+                );
+                
+                if let Err(e) = bot
+                    .send_message(ChatId(*user_id), &full_message)
+                    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                    .await
+                {
+                    log::error!("Failed to send reminder to user {}: {}", user_id, e);
+                    continue;
+                }
+            }
+        }
+
+        
     }
 
     drop(preferences);

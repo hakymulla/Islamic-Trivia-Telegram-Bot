@@ -37,10 +37,11 @@ async fn axum(
         .expect("Failed to load questions");
     log::info!("Loaded {} questions", questions.len());
 
-    let reminder_templates = state::load_reminder_templates()
+    let (reminder_templates, reminder_templates_act) = state::load_reminder_templates()
         .await
         .expect("Failed to load reminder templates");
     log::info!("Loaded {} reminder templates", reminder_templates.len());
+    log::info!("Loaded {} reminder templates Act", reminder_templates_act.len());
 
     let user_scores = UserScore::load_scores()
         .expect("Failed to load user scores");
@@ -64,6 +65,7 @@ async fn axum(
         user_scores: Mutex::new(user_scores),
         rng: Mutex::new(StdRng::from_entropy()),
         reminder_templates,
+        reminder_templates_act,
         user_preferences: Mutex::new(user_preferences),
     });
 

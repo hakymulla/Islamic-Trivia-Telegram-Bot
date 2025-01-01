@@ -11,6 +11,16 @@ pub struct ReminderTemplate {
 }
 
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReminderTemplateAct {
+    pub message: String,
+    pub act: String,
+    pub reference: String,
+}
+
+
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserReminderPreferences {
     pub user_id: i64,
