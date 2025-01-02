@@ -137,18 +137,31 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
     let mut template_sender_act_id = 0;
 
     let mut interval = interval(Duration::from_secs(60)); // 60sec interval check
-    let mut next_send_time = Utc::now() + Duration::from_secs(5); // First send at 1 minute
+    // let mut next_send_time = Utc::now() + Duration::from_secs(5);
     let mut last_monday_check = Utc::now().date_naive();
 
-    let next_send_time_act = Utc::now() + Duration::from_secs(5); // First send at 1 minute
-    let last_check_date = Utc::now().date_naive();
+    let mut next_send_time_act = Utc::now() + Duration::from_secs(10); 
+    let mut last_check_date = Utc::now().date_naive();
 
     loop {
         let now = Utc::now();
 
-        if now >= next_send_time {
+        log::info!("loop");
+
+        if now >= next_send_time_act {
+            send_reminders(&bot, &state, template_sender_act_id, false).await;
+            log::info!("send rem 1");
+
             send_reminders(&bot, &state, template_sender_id, true).await;
-            next_send_time = now + Duration::from_secs(21600); // Update next send time (4hrs)
+            log::info!("send rem 2");
+
+            next_send_time_act = now + Duration::from_secs(21600); // Update next send time (4hrs)
+
+            if now.date_naive() != last_check_date {
+                template_sender_act_id += 1;
+                last_check_date = now.date_naive(); 
+                log::info!("Monday detected: Incremented template_sender_id to {}", template_sender_act_id);
+            }
 
             if now.weekday() == Weekday::Mon && now.date_naive() != last_monday_check {
                 template_sender_id += 1;
@@ -157,15 +170,17 @@ pub async fn start_reminder_sender(bot: Bot, state: Arc<BotState>) {
             }
         }
 
-        if now >= next_send_time_act {
-            send_reminders(&bot, &state, template_sender_act_id, false).await;
-            next_send_time = now + Duration::from_secs(21600); // Update next send time (4hrs)
+        // if now >= next_send_time {
+        //     send_reminders(&bot, &state, template_sender_id, true).await;
+        //     log::info!("send rem 2");
+        //     next_send_time = now + Duration::from_secs(21600); // Update next send time (4hrs)
 
-            if now.date_naive() != last_check_date {
-                template_sender_act_id += 1;
-                log::info!("Monday detected: Incremented template_sender_id to {}", template_sender_act_id);
-            }
-        }
+        //     if now.weekday() == Weekday::Mon && now.date_naive() != last_monday_check {
+        //         template_sender_id += 1;
+        //         last_monday_check = now.date_naive(); // Update the last check date
+        //         log::info!("Monday detected: Incremented template_sender_id to {}", template_sender_id);
+        //     }
+        // }
         interval.tick().await;
     }
 }
@@ -187,14 +202,14 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: us
         }
 
         // Check if at least 1 minute has passed since last reminder
-        if let Some(last_reminder) = prefs.last_reminder {
-            if (now - last_reminder).num_minutes() < 1 {
-                continue;
-            }
-        }
+        // if let Some(last_reminder) = prefs.last_reminder {
+        //     if (now - last_reminder).num_minutes() < 1 {
+        //         continue;
+        //     }
+        // }
 
         // Use the thread-safe RNG instance
-        if is_template {
+        if is_template == true {
             if let Some(template) = state.reminder_templates.get(template_sender_id) {
                 fn escape_markdown_v2(text: &str) -> String {
                     text.chars()
