@@ -221,7 +221,7 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: us
                 }
     
                 let full_message = format!(
-                    "❁❀❁❀ 🌅 *Remembrance* 🕌 ❀❁❀❁\n\
+                    "❁❀❁❀ 🌅 *Reminder* 🕌 ❀❁❀❁\n\
                     ━━━━━━━━━━━━━━━━━━━━━\n\
                     *{}* \n\n\
                     ✨ *𝒜𝓇𝒶𝒷𝒾𝒸 𝒯𝑒𝓍𝓉:*\n\
@@ -263,7 +263,7 @@ async fn send_reminders(bot: &Bot, state: &Arc<BotState>, template_sender_id: us
                 }
     
                 let full_message = format!(
-                    "❁❀❁❀ 🌅 *Remembrance* 🕌 ❀❁❀❁\n\
+                    "❁❀❁❀ 🌅 *Reminder* 🕌 ❀❁❀❁\n\
                     ━━━━━━━━━━━━━━━━━━━━━\n\
                     *{}* \n\n\
                     🔤 *𝒜𝒸𝓉:*\n\

@@ -40,6 +40,7 @@ async fn axum(
     let (reminder_templates, reminder_templates_act) = state::load_reminder_templates()
         .await
         .expect("Failed to load reminder templates");
+    
     log::info!("Loaded {} reminder templates", reminder_templates.len());
     log::info!("Loaded {} reminder templates Act", reminder_templates_act.len());
 
